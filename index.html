@@ -1,12 +1,63 @@
 <!DOCTYPE html>
-<html>
+<html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Test Vercel</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Copilot Entretien v3.9</title>
+    <style>
+        body { background: #121212; color: white; font-family: 'Segoe UI', sans-serif; text-align: center; padding: 40px 20px; margin: 0; }
+        .card { background: #1e1e1e; padding: 30px; border-radius: 15px; border: 1px solid #333; max-width: 450px; margin: 0 auto; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        button { width: 100%; padding: 15px; background: #4bb543; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 16px; margin-bottom: 20px; }
+        button:disabled { background: #333; cursor: not-allowed; }
+        #output { color: #888; font-style: italic; margin-bottom: 20px; min-height: 1.2em; }
+        #ai-response { background: #2d2d2d; padding: 20px; border-radius: 10px; color: #00ff00; text-align: left; border-left: 4px solid #4bb543; line-height: 1.5; font-family: monospace; }
+        .error { color: #ff4444; margin-top: 15px; font-size: 0.8em; display: none; }
+    </style>
 </head>
-<body style="background-color: #121212; color: white; text-align: center; padding-top: 50px; font-family: sans-serif;">
-    <h1>L'ASSISTANT EST EN LIGNE</h1>
-    <p>Si vous voyez ce message, Vercel fonctionne.</p>
-    <button onclick="alert('Le bouton fonctionne !')" style="padding: 10px 20px; background: green; color: white; border: none; border-radius: 5px; cursor: pointer;">TESTER LE BOUTON</button>
-</body>
-</html>
+<body>
+
+<div class="card">
+    <h2 style="margin-top:0;">Copilot AI v3.9</h2>
+    <button id="btn">🎙️ CLIQUEZ ET PARLEZ</button>
+    <div id="output">Prêt à écouter...</div>
+    <div id="ai-response">La réponse s'affichera ici.</div>
+    <div id="debug" class="error"></div>
+</div>
+
+<script>
+    // --- CONFIGURATION ---
+    const API_KEY = "AIzaSyBVzeqmNIWmuOL4IP6nts-BcUQi2Ch7Awk";
+    const MODEL = "gemini-1.5-flash"; 
+
+    const btn = document.getElementById('btn');
+    const output = document.getElementById('output');
+    const aiResponse = document.getElementById('ai-response');
+    const debug = document.getElementById('debug');
+
+    // Vérification du micro
+    const Speech = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!Speech) {
+        output.innerText = "Navigateur non compatible (Utilisez Chrome).";
+    }
+
+    async function askGemini(text) {
+        aiResponse.innerText = "Réflexion...";
+        debug.style.display = "none";
+        btn.disabled = true;
+
+        // URL stable v1beta
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${API_KEY}`;
+
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{ parts: [{ text: "Réponds très brièvement (max 2 phrases) pour un entretien : " + text }] }]
+                })
+            });
+
+            const data = await response.json();
+
+            if (response.ok && data.candidates) {
+                const result = data.candidates[0].content.parts[0].text;
