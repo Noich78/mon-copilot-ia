@@ -2,36 +2,23 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Copilot Entretien v3.3</title>
+    <title>Copilot Entretien v3.4</title>
     <style>
-        :root { --primary: #4bb543; --error: #ff4444; --bg: #121212; }
-        body { font-family: 'Segoe UI', sans-serif; padding: 20px; background: var(--bg); color: white; display: flex; justify-content: center; }
-        .card { background: #1e1e1e; padding: 25px; border-radius: 12px; border: 1px solid #333; width: 100%; max-width: 550px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
-        
-        #start-btn { width: 100%; padding: 15px; background: var(--primary); border: none; color: white; cursor: pointer; border-radius: 8px; font-weight: bold; font-size: 1.1em; transition: 0.3s; }
-        #start-btn:disabled { background: #444; cursor: not-allowed; opacity: 0.7; }
-        
-        #output { margin-top: 20px; color: #aaa; font-style: italic; min-height: 24px; border-bottom: 1px solid #333; padding-bottom: 10px; }
-        #ai-response { margin-top: 20px; padding: 15px; background: #2d2d2d; border-radius: 8px; color: #00ff00; font-family: monospace; line-height: 1.6; border-left: 4px solid var(--primary); }
-        
-        .error-log { color: var(--error); font-size: 0.85em; margin-top: 15px; padding: 10px; border: 1px dashed var(--error); display: none; background: rgba(255, 68, 68, 0.1); }
-        .status-tag { font-size: 0.7em; text-transform: uppercase; letter-spacing: 1px; color: #777; margin-bottom: 5px; display: block; }
+        body { font-family: sans-serif; padding: 20px; background: #121212; color: white; display: flex; justify-content: center; }
+        .card { background: #1e1e1e; padding: 25px; border-radius: 12px; border: 1px solid #333; width: 100%; max-width: 500px; }
+        #start-btn { width: 100%; padding: 15px; background: #4bb543; border: none; color: white; cursor: pointer; border-radius: 8px; font-weight: bold; }
+        #start-btn:disabled { background: #444; }
+        #ai-response { margin-top: 20px; padding: 15px; background: #2d2d2d; border-radius: 8px; color: #00ff00; border-left: 4px solid #4bb543; min-height: 40px; }
+        .error-log { color: #ff4444; font-size: 0.8em; margin-top: 15px; display: none; }
     </style>
 </head>
 <body>
 
 <div class="card">
-    <span class="status-tag">Assistant Entretien - Stable v1</span>
-    <h2 style="margin: 0 0 20px 0;">Copilot AI v3.3</h2>
-    
-    <button id="start-btn">🎙️ COMMENCER À PARLER</button>
-    
-    <div id="output">En attente du micro...</div>
-    
-    <span class="status-tag" style="margin-top:20px;">Réponse de l'IA</span>
-    <div id="ai-response">Prêt pour votre entretien.</div>
-    
+    <h3>Copilot v3.4 (Force Connect)</h3>
+    <button id="start-btn">🎙️ CLIQUER ET PARLER</button>
+    <div id="output" style="margin-top:15px; color:#999;"></div>
+    <div id="ai-response">En attente...</div>
     <div id="debug-log" class="error-log"></div>
 </div>
 
@@ -41,17 +28,14 @@
     const aiResponse = document.getElementById('ai-response');
     const debugLog = document.getElementById('debug-log');
 
-    // --- CONFIGURATION ---
-    // Utilisation de la version STABLE v1 pour éviter les erreurs 404
+    // CONFIGURATION FORCEE
     const API_KEY = "AIzaSyCGswZk1ZJZalmAGZVY3Sz9D0cIUPisObk"; 
-    const MODEL_ID = "gemini-1.5-flash"; // Nom de modèle standard
-    const COOLDOWN_TIME = 15000; // 15 secondes (Limite Free Tier)
+    // On change pour gemini-pro qui est l'alias le plus stable
+    const MODEL_ID = "gemini-pro"; 
 
-    // --- RECONNAISSANCE VOCALE ---
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     const recognition = new SpeechRecognition();
     recognition.lang = 'fr-FR';
-    recognition.continuous = false; // Plus stable pour éviter d'envoyer 5 requêtes par seconde
 
     recognition.onresult = (event) => {
         const transcript = event.results[0][0].transcript;
@@ -59,21 +43,9 @@
         askGemini(transcript);
     };
 
-    recognition.onstart = () => {
-        startBtn.innerText = "ÉCOUTE EN COURS...";
-        startBtn.style.background = "#cc0000";
-        debugLog.style.display = "none";
-    };
-
-    recognition.onerror = () => {
-        resetButton();
-        debugLog.innerText = "Erreur micro. Vérifiez les autorisations.";
-        debugLog.style.display = "block";
-    };
-
-   async function askGemini(text) {
-        // AJOUT DE "models/" AVANT LE NOM DU MODÈLE
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`;
+    async function askGemini(text) {
+        // Utilisation de l'endpoint v1 stable (souvent plus fiable que v1beta pour gemini-pro)
+        const url = `https://generativelanguage.googleapis.com/v1/models/${MODEL_ID}:generateContent?key=${API_KEY}`;
         
         aiResponse.innerText = "Réflexion...";
         startBtn.disabled = true;
@@ -83,69 +55,41 @@
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    contents: [{ 
-                        parts: [{ text: "Réponds en une seule phrase courte pour un entretien : " + text }] 
-                    }]
+                    contents: [{ parts: [{ text: "Réponse courte pour entretien : " + text }] }]
                 })
             });
 
             const data = await response.json();
 
-            // Gestion spécifique de l'erreur 404
-            if (response.status === 404) {
-                throw new Error("L'API ne trouve pas ce modèle. Vérifiez si 'models/' est bien dans l'URL.");
-            }
-
             if (response.ok && data.candidates) {
                 const aiText = data.candidates[0].content.parts[0].text;
                 aiResponse.innerText = aiText;
-                speak(aiText);
+                
+                // Audio
+                window.speechSynthesis.cancel();
+                window.speechSynthesis.speak(new SpeechSynthesisUtterance(aiText));
             } else {
-                throw new Error(data.error ? data.error.message : "Erreur API");
+                // Si gemini-pro échoue aussi, on affiche le détail technique
+                const errorDetail = data.error ? data.error.message : "Erreur Inconnue";
+                throw new Error(errorDetail);
             }
         } catch (e) {
-            debugLog.innerText = "ERREUR : " + e.message;
             debugLog.style.display = "block";
-            aiResponse.innerText = "Erreur de réponse.";
+            debugLog.innerText = "LOG : " + e.message;
+            aiResponse.innerText = "Erreur de connexion.";
         } finally {
-            startCooldown();
+            // Attente de 10s pour le quota
+            setTimeout(() => {
+                startBtn.disabled = false;
+                startBtn.innerText = "🎙️ CLIQUER ET PARLER";
+            }, 10000);
         }
     }
 
-    // --- ANTI-QUOTA & UI ---
-    function startCooldown() {
-        let timeLeft = Math.floor(COOLDOWN_TIME / 1000);
-        startBtn.disabled = true;
-        
-        const timer = setInterval(() => {
-            startBtn.innerText = `PATIENTEZ (${timeLeft}s)`;
-            timeLeft--;
-            if (timeLeft < 0) {
-                clearInterval(timer);
-                resetButton();
-            }
-        }, 1000);
-    }
-
-    function resetButton() {
-        startBtn.disabled = false;
-        startBtn.innerText = "🎙️ COMMENCER À PARLER";
-        startBtn.style.background = "#4bb543";
-    }
-
-    // --- SYNTHÈSE VOCALE ---
-    function speak(text) {
-        window.speechSynthesis.cancel();
-        const msg = new SpeechSynthesisUtterance(text);
-        msg.lang = 'fr-FR';
-        msg.rate = 1.0;
-        window.speechSynthesis.speak(msg);
-    }
-
     startBtn.onclick = () => {
-        if (!startBtn.disabled) recognition.start();
+        recognition.start();
+        startBtn.innerText = "ÉCOUTE...";
     };
 </script>
-
 </body>
 </html>
