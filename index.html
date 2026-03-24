@@ -41,31 +41,31 @@
     async function askGemini(text) {
     const API_KEY = "AIzaSyCWxtuSTP2zsRK7GfKUQesy8R3Z05KcqQY";
     
-    // On repasse en v1beta pour le modèle flash qui est le plus compatible en gratuit
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`;
+    // On utilise "gemini-1.5-flash-latest" qui est le nom universel
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${API_KEY}`;
 
     try {
         const response = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                contents: [{ parts: [{ text: "Réponse courte : " + text }] }]
+                contents: [{ parts: [{ text: "Donne une réponse très courte : " + text }] }]
             })
         });
 
         const data = await response.json();
 
-        if (response.ok) {
-            // Ça va marcher ici !
-            const answer = data.candidates[0].content.parts[0].text;
-            aiResponse.innerText = answer;
+        if (response.ok && data.candidates) {
+            aiResponse.innerText = data.candidates[0].content.parts[0].text;
             debugLog.innerText = ""; 
         } else {
-            // Affichage de l'erreur précise si Google change encore d'avis
-            debugLog.innerText = "ERREUR : " + (data.error ? data.error.message : "Inconnue");
+            // Si ça échoue encore, on affiche le code d'erreur exact
+            const details = data.error ? data.error.message : "Format de réponse inconnu";
+            debugLog.innerText = "ERREUR : " + details;
+            console.log("Full Data:", data);
         }
     } catch (e) {
-        debugLog.innerText = "ERREUR RESEAU : " + e.message;
+        debugLog.innerText = "ERREUR RÉSEAU : " + e.message;
     }
 }
 
