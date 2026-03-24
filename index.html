@@ -40,32 +40,47 @@
 
     async function askGemini(text) {
     const API_KEY = "AIzaSyCWxtuSTP2zsRK7GfKUQesy8R3Z05KcqQY";
-    
-    // On utilise "gemini-1.5-flash-latest" qui est le nom universel
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${API_KEY}`;
+    const baseUrl = "https://generativelanguage.googleapis.com/v1beta";
 
     try {
-        const response = await fetch(url, {
+        // 1. On demande à Google : "A quels modèles ai-je droit ?"
+        const listResponse = await fetch(`${baseUrl}/models?key=${API_KEY}`);
+        const listData = await listResponse.json();
+        
+        // 2. On cherche un modèle qui contient "gemini-1.5-flash" ou "gemini-pro"
+        const availableModel = listData.models.find(m => 
+            m.name.includes("gemini-1.5-flash") || m.name.includes("gemini-pro")
+        );
+
+        if (!availableModel) {
+            debugLog.innerText = "ERREUR : Aucun modèle Gemini trouvé sur ton compte.";
+            console.log("Modèles dispos :", listData.models);
+            return;
+        }
+
+        const modelName = availableModel.name; // Exemple: "models/gemini-1.5-flash"
+        console.log("Utilisation du modèle :", modelName);
+
+        // 3. On fait l'appel avec le bon nom trouvé
+        const response = await fetch(`${baseUrl}/${modelName}:generateContent?key=${API_KEY}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                contents: [{ parts: [{ text: "Donne une réponse très courte : " + text }] }]
+                contents: [{ parts: [{ text: "Réponse très courte : " + text }] }]
             })
         });
 
         const data = await response.json();
 
-        if (response.ok && data.candidates) {
+        if (response.ok) {
             aiResponse.innerText = data.candidates[0].content.parts[0].text;
-            debugLog.innerText = ""; 
+            debugLog.innerText = "Modèle utilisé : " + modelName; 
         } else {
-            // Si ça échoue encore, on affiche le code d'erreur exact
-            const details = data.error ? data.error.message : "Format de réponse inconnu";
-            debugLog.innerText = "ERREUR : " + details;
-            console.log("Full Data:", data);
+            debugLog.innerText = "ERREUR : " + (data.error ? data.error.message : "Inconnue");
         }
     } catch (e) {
-        debugLog.innerText = "ERREUR RÉSEAU : " + e.message;
+        debugLog.innerText = "ERREUR SYSTÈME : " + e.message;
+        console.error(e);
     }
 }
 
