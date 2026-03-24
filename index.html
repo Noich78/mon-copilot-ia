@@ -38,49 +38,41 @@
         askGemini(transcript);
     };
 
-    async function askGemini(text) {
+   async function askGemini(text) {
     const API_KEY = "AIzaSyCWxtuSTP2zsRK7GfKUQesy8R3Z05KcqQY";
-    const baseUrl = "https://generativelanguage.googleapis.com/v1beta";
+    
+    // L'URL exacte pour Gemini 1.5 Flash
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`;
 
     try {
-        // 1. On demande à Google : "A quels modèles ai-je droit ?"
-        const listResponse = await fetch(`${baseUrl}/models?key=${API_KEY}`);
-        const listData = await listResponse.json();
-        
-        // 2. On cherche un modèle qui contient "gemini-1.5-flash" ou "gemini-pro"
-        const availableModel = listData.models.find(m => 
-            m.name.includes("gemini-1.5-flash") || m.name.includes("gemini-pro")
-        );
-
-        if (!availableModel) {
-            debugLog.innerText = "ERREUR : Aucun modèle Gemini trouvé sur ton compte.";
-            console.log("Modèles dispos :", listData.models);
-            return;
-        }
-
-        const modelName = availableModel.name; // Exemple: "models/gemini-1.5-flash"
-        console.log("Utilisation du modèle :", modelName);
-
-        // 3. On fait l'appel avec le bon nom trouvé
-        const response = await fetch(`${baseUrl}/${modelName}:generateContent?key=${API_KEY}`, {
+        const response = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                contents: [{ parts: [{ text: "Réponse très courte : " + text }] }]
+                contents: [{ 
+                    parts: [{ text: "Réponds de façon très concise et professionnelle pour un entretien : " + text }] 
+                }]
             })
         });
 
         const data = await response.json();
 
-        if (response.ok) {
-            aiResponse.innerText = data.candidates[0].content.parts[0].text;
-            debugLog.innerText = "Modèle utilisé : " + modelName; 
+        if (response.ok && data.candidates) {
+            // Affichage du résultat
+            const aiText = data.candidates[0].content.parts[0].text;
+            aiResponse.innerText = aiText;
+            debugLog.innerText = ""; // On nettoie les erreurs précédentes
         } else {
-            debugLog.innerText = "ERREUR : " + (data.error ? data.error.message : "Inconnue");
+            // Affichage de l'erreur (Quota ou Géographie)
+            const errorMsg = data.error ? data.error.message : "Erreur de réponse";
+            debugLog.innerText = "Statut : " + errorMsg;
+            
+            if (errorMsg.includes("quota")) {
+                debugLog.innerText += " -> ACTIVE TON VPN (USA/UK) !";
+            }
         }
     } catch (e) {
-        debugLog.innerText = "ERREUR SYSTÈME : " + e.message;
-        console.error(e);
+        debugLog.innerText = "ERREUR RÉSEAU : " + e.message;
     }
 }
 
