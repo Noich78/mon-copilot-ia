@@ -43,11 +43,17 @@
     const aiResponse = document.getElementById('ai-response');
     const debugLog = document.getElementById('debug-log');
 
-    // CONFIGURATION
-    const API_KEY = "AIzaSyCGswZk1ZJZalmAGZVY3Sz9D0cIUPisObk"; // ⚠️ REMPLACE TA CLÉ ICI
-    const MODEL_NAME = "gemini-1.5-flash-latest"; // Modèle le plus compatible
-    const COOLDOWN_TIME = 15000; // 15 secondes d'attente entre requêtes pour le quota
+    // CONFIGURATION MISE À JOUR 2026
+    const API_KEY = "AIzaSyCGswZk1ZJZalmAGZVY3Sz9D0cIUPisObk"; // Votre clé actuelle
+    const MODEL_NAME = "gemini-2.0-flash"; // On passe à la version 2.0 ou 1.5-flash sans "-latest"
+    const COOLDOWN_TIME = 12000; 
 
+    async function askGemini(text) {
+    // ESSAYEZ CETTE URL (Version stable v1 au lieu de v1beta si la 404 persiste)
+    const url = `https://generativelanguage.googleapis.com/v1/models/${MODEL_NAME}:generateContent?key=${API_KEY}`;
+    
+    
+    
     // RECONNAISSANCE VOCALE
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     const recognition = new SpeechRecognition();
