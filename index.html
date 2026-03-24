@@ -1,31 +1,6 @@
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-    <meta charset="UTF-8">
-    <title>Assistant Entretien Final</title>
-    <style>
-        body { background: #121212; color: #e0e0e0; font-family: 'Segoe UI', sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-        .card { background: #1e1e1e; padding: 30px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); width: 400px; text-align: center; border: 1px solid #333; }
-        button { width: 100%; padding: 15px; background: #4bb543; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 16px; transition: 0.3s; }
-        button:disabled { background: #333; cursor: not-allowed; }
-        #output { margin: 20px 0; font-style: italic; color: #888; min-height: 20px; }
-        #res { background: #2d2d2d; padding: 15px; border-radius: 8px; color: #00ff00; font-family: monospace; text-align: left; border-left: 4px solid #4bb543; }
-    </style>
-</head>
-<body>
-
-<div class="card">
-    <h2 style="margin-top:0;">Copilot AI v3.6</h2>
-    <button id="btn">🎙️ CLIQUEZ POUR PARLER</button>
-    <div id="output">En attente...</div>
-    <div id="res">La réponse s'affichera ici.</div>
-</div>
-
 <script>
-    // --- CONFIGURATION ---
-    const API_KEY = "AIzaSyBVzeqmNIWmuOL4IP6nts-BcUQi2Ch7Awk"; // Ta nouvelle clé
-    const MODEL = "gemini-1.5-flash"; // Si 404 persiste, remplace par "gemini-pro"
-
+    const API_KEY = "AIzaSyBVzeqmNIWmuOL4IP6nts-BcUQi2Ch7Awk";
+    
     const btn = document.getElementById('btn');
     const out = document.getElementById('output');
     const res = document.getElementById('res');
@@ -40,59 +15,55 @@
             out.innerText = "Entendu : " + txt;
             askGemini(txt);
         };
-        rec.onend = () => { if(btn.innerText === "ÉCOUTE...") resetButton(); };
     }
 
     async function askGemini(prompt) {
-        res.innerText = "Réflexion en cours...";
+        res.innerText = "Recherche du meilleur modèle...";
         btn.disabled = true;
 
-        // URL CORRIGÉE : Passage en v1 (stable) au lieu de v1beta
-        const url = `https://generativelanguage.googleapis.com/v1/models/${MODEL}:generateContent?key=${API_KEY}`;
-        
         try {
+            // ÉTAPE 1 : On demande la liste des modèles supportés par TA clé
+            const listUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${API_KEY}`;
+            const listResponse = await fetch(listUrl);
+            const listData = await listResponse.json();
+            
+            // On cherche un modèle qui contient "flash" ou "pro" dans la liste
+            const availableModel = listData.models.find(m => 
+                m.supportedGenerationMethods.includes("generateContent")
+            );
+
+            if (!availableModel) throw new Error("Aucun modèle trouvé pour cette clé.");
+            
+            const modelName = availableModel.name; // C'est le nom exact (ex: models/gemini-1.5-flash-8b)
+            res.innerText = "Modèle trouvé : " + modelName + ". Réflexion...";
+
+            // ÉTAPE 2 : On fait la vraie requête avec le nom trouvé
+            const url = `https://generativelanguage.googleapis.com/v1beta/${modelName}:generateContent?key=${API_KEY}`;
+            
             const response = await fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    contents: [{ parts: [{ text: "Réponds brièvement pour un entretien : " + prompt }] }]
+                    contents: [{ parts: [{ text: "Réponds brièvement en français : " + prompt }] }]
                 })
             });
 
             const data = await response.json();
-
-            if (response.ok && data.candidates) {
+            if (response.ok) {
                 const aiTxt = data.candidates[0].content.parts[0].text;
                 res.innerText = aiTxt;
-                // Voix
-                const speech = new SpeechSynthesisUtterance(aiTxt);
-                speech.lang = 'fr-FR';
-                window.speechSynthesis.speak(speech);
+                window.speechSynthesis.speak(new SpeechSynthesisUtterance(aiTxt));
             } else {
-                // Affiche l'erreur réelle de Google pour diagnostiquer
-                const msg = data.error ? data.error.message : "Erreur inconnue";
-                res.innerText = "ERREUR : " + msg;
-                console.error("Détail:", data);
+                res.innerText = "Erreur : " + data.error.message;
             }
         } catch (err) {
-            res.innerText = "Erreur de connexion réseau.";
+            res.innerText = "ERREUR : " + err.message;
+            console.error(err);
         } finally {
-            setTimeout(resetButton, 3000); // Débloque après 3 secondes
+            btn.disabled = false;
+            btn.innerText = "🎙️ CLIQUEZ POUR PARLER";
         }
     }
 
-    function resetButton() {
-        btn.disabled = false;
-        btn.innerText = "🎙️ CLIQUEZ POUR PARLER";
-        btn.style.background = "#4bb543";
-    }
-
-    btn.onclick = () => {
-        if (!rec) return alert("Micro non supporté");
-        rec.start();
-        btn.innerText = "ÉCOUTE...";
-        btn.style.background = "#cc0000";
-    };
+    btn.onclick = () => { rec.start(); btn.innerText = "ÉCOUTE..."; };
 </script>
-</body>
-</html>
