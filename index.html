@@ -2,72 +2,82 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Copilot Final Fix v6.1</title>
+    <title>Copilot Entretien v7.0</title>
     <style>
-        body { background: #000; color: #fff; font-family: sans-serif; text-align: center; padding: 20px; }
-        .box { border: 1px solid #333; padding: 20px; border-radius: 10px; background: #111; max-width: 450px; margin: auto; }
-        button { width: 100%; padding: 15px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
-        #res { margin-top: 20px; color: #0f0; min-height: 40px; text-align: left; }
-        .debug-panel { margin-top: 20px; font-size: 10px; color: #666; text-align: left; background: #050505; padding: 10px; border: 1px dashed #222; }
+        body { background: #0a0a0a; color: #fff; font-family: 'Segoe UI', sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .card { background: #161616; padding: 30px; border-radius: 20px; border: 1px solid #333; width: 400px; text-align: center; box-shadow: 0 20px 50px rgba(0,0,0,0.8); }
+        button { width: 100%; padding: 18px; background: #00c851; color: white; border: none; border-radius: 12px; font-weight: bold; cursor: pointer; font-size: 16px; transition: 0.2s; }
+        button:disabled { background: #333; cursor: not-allowed; color: #777; }
+        #res { margin-top: 25px; padding: 15px; background: #222; border-radius: 10px; color: #00ff00; text-align: left; border-left: 5px solid #00c851; min-height: 50px; font-family: monospace; }
+        .status { font-size: 0.8em; color: #666; margin-top: 10px; }
     </style>
 </head>
 <body>
 
-<div class="box">
-    <h3>Copilot v6.1</h3>
-    <button id="btn">🎙️ CLIQUEZ ET PARLEZ</button>
-    <div id="res">En attente de votre question...</div>
-    <div id="debug" class="debug-panel">Logs : Prêt.</div>
+<div class="card">
+    <h2 style="margin-bottom: 5px;">Copilot v7.0</h2>
+    <div id="status" class="status">Prêt pour l'entretien</div>
+    <div id="output" style="margin: 20px 0; color: #aaa; font-style: italic;">Cliquez pour parler...</div>
+    <button id="btn">🎙️ COMMENCER À PARLER</button>
+    <div id="res">La réponse s'affichera ici.</div>
 </div>
 
 <script>
     const API_KEY = "AIzaSyBVzeqmNIWmuOL4IP6nts-BcUQi2Ch7Awk";
+    // On utilise 1.5-flash-8b sur l'endpoint v1 (plus robuste aux erreurs 404)
+    const MODEL = "gemini-1.5-flash-8b"; 
+
     const btn = document.getElementById('btn');
+    const status = document.getElementById('status');
+    const output = document.getElementById('output');
     const res = document.getElementById('res');
-    const debug = document.getElementById('debug');
 
     async function askGemini(text) {
         btn.disabled = true;
-        res.innerText = "Analyse en cours...";
+        res.innerText = "Réflexion...";
         
+        // Utilisation de l'endpoint v1 stable
+        const url = `https://generativelanguage.googleapis.com/v1/models/${MODEL}:generateContent?key=${API_KEY}`;
+
         try {
-            // Utilisation directe du modèle pour économiser une requête de diagnostic
-            const activeModel = "gemini-1.5-flash"; 
-            const genUrl = `https://generativelanguage.googleapis.com/v1beta/models/${activeModel}:generateContent?key=${API_KEY}`;
-            
-            const response = await fetch(genUrl, {
+            const response = await fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ contents: [{ parts: [{ text: "Réponse courte : " + text }] }] })
+                body: JSON.stringify({
+                    contents: [{ parts: [{ text: "Réponds très brièvement : " + text }] }]
+                })
             });
 
             const data = await response.json();
 
-            if (response.status === 429) {
-                throw new Error("QUOTA DÉPASSÉ : Attendez 1 minute avant de reparler.");
-            }
+            if (response.status === 404) throw new Error("Modèle non reconnu sur cet endpoint.");
+            if (response.status === 429) throw new Error("Quota atteint. Patientez 60s.");
 
-            if (response.ok) {
+            if (response.ok && data.candidates) {
                 const aiTxt = data.candidates[0].content.parts[0].text;
                 res.innerText = aiTxt;
-                window.speechSynthesis.speak(new SpeechSynthesisUtterance(aiTxt));
+                
+                // Audio
+                window.speechSynthesis.cancel();
+                const speech = new SpeechSynthesisUtterance(aiTxt);
+                speech.lang = 'fr-FR';
+                window.speechSynthesis.speak(speech);
             } else {
-                throw new Error(data.error.message);
+                throw new Error(data.error ? data.error.message : "Erreur API");
             }
         } catch (e) {
-            res.innerText = "Pause nécessaire...";
-            debug.innerText = "LOG : " + e.message;
-            debug.style.display = "block";
+            res.innerText = "ERREUR : " + e.message;
+            console.error(e);
         } finally {
-            // ON FORCE UNE PAUSE DE 15 SECONDES SUR LE BOUTON
-            let timeLeft = 15;
+            // Pause de sécurité pour le quota
+            let countdown = 10;
             const timer = setInterval(() => {
-                btn.innerText = `PATIENTEZ (${timeLeft}s)`;
-                timeLeft--;
-                if (timeLeft < 0) {
+                btn.innerText = `ATTENTE (${countdown}s)`;
+                countdown--;
+                if (countdown < 0) {
                     clearInterval(timer);
                     btn.disabled = false;
-                    btn.innerText = "🎙️ CLIQUEZ ET PARLEZ";
+                    btn.innerText = "🎙️ COMMENCER À PARLER";
                 }
             }, 1000);
         }
@@ -75,12 +85,18 @@
 
     btn.onclick = () => {
         const Speech = window.SpeechRecognition || window.webkitSpeechRecognition;
-        if (!Speech) return alert("Chrome requis.");
+        if (!Speech) return alert("Chrome requis");
+
         const rec = new Speech();
         rec.lang = 'fr-FR';
-        rec.onresult = (e) => askGemini(e.results[0][0].transcript);
+        rec.onstart = () => { btn.innerText = "ÉCOUTE..."; btn.disabled = true; };
+        rec.onresult = (e) => {
+            const txt = e.results[0][0].transcript;
+            output.innerText = "Vous : " + txt;
+            askGemini(txt);
+        };
+        rec.onerror = () => { btn.disabled = false; btn.innerText = "RÉESSAYER"; };
         rec.start();
-        btn.innerText = "ÉCOUTE EN COURS...";
     };
 </script>
 
