@@ -3,85 +3,88 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Copilot Entretien v3.9</title>
+    <title>Copilot Entretien v4.0</title>
     <style>
-        body { background: #121212; color: white; font-family: 'Segoe UI', sans-serif; text-align: center; padding: 40px 20px; margin: 0; }
-        .card { background: #1e1e1e; padding: 30px; border-radius: 15px; border: 1px solid #333; max-width: 450px; margin: 0 auto; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
-        button { width: 100%; padding: 15px; background: #4bb543; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 16px; margin-bottom: 20px; }
+        body { background: #121212; color: white; font-family: 'Segoe UI', sans-serif; text-align: center; padding: 40px 20px; }
+        .card { background: #1e1e1e; padding: 30px; border-radius: 15px; border: 1px solid #333; max-width: 450px; margin: 0 auto; }
+        button { width: 100%; padding: 15px; background: #4bb543; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 16px; transition: 0.3s; }
         button:disabled { background: #333; cursor: not-allowed; }
-        #output { color: #888; font-style: italic; margin-bottom: 20px; min-height: 1.2em; }
-        #ai-response { background: #2d2d2d; padding: 20px; border-radius: 10px; color: #00ff00; text-align: left; border-left: 4px solid #4bb543; line-height: 1.5; font-family: monospace; }
-        .error { color: #ff4444; margin-top: 15px; font-size: 0.8em; display: none; }
+        #output { color: #888; font-style: italic; margin: 20px 0; min-height: 1.2em; }
+        #ai-response { background: #2d2d2d; padding: 20px; border-radius: 10px; color: #00ff00; text-align: left; border-left: 4px solid #4bb543; font-family: monospace; }
+        .error { color: #ff4444; margin-top: 15px; font-size: 0.8em; display: none; background: rgba(255,0,0,0.1); padding: 10px; border-radius: 5px; }
     </style>
 </head>
 <body>
 
 <div class="card">
-    <h2 style="margin-top:0;">Copilot AI v3.9</h2>
+    <h2 style="margin-top:0;">Copilot AI v4.0</h2>
     <button id="btn">🎙️ CLIQUEZ ET PARLEZ</button>
-    <div id="output">Prêt à écouter...</div>
+    <div id="output">Prêt...</div>
     <div id="ai-response">La réponse s'affichera ici.</div>
     <div id="debug" class="error"></div>
 </div>
 
 <script>
+    // --- CONFIGURATION ---
+    const API_KEY = "AIzaSyBVzeqmNIWmuOL4IP6nts-BcUQi2Ch7Awk";
+    // CHANGEMENT : On utilise l'alias 'latest' ou 'gemini-1.5-flash' sur l'endpoint V1
+    const MODEL = "gemini-1.5-flash-latest"; 
+
     const btn = document.getElementById('btn');
     const output = document.getElementById('output');
     const aiResponse = document.getElementById('ai-response');
     const debug = document.getElementById('debug');
 
-    const API_KEY = "AIzaSyBVzeqmNIWmuOL4IP6nts-BcUQi2Ch7Awk";
-    const MODEL = "gemini-1.5-flash"; 
-
-    // Fonction pour envoyer le texte à Gemini
     async function askGemini(text) {
         aiResponse.innerText = "Réflexion...";
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${API_KEY}`;
+        debug.style.display = "none";
+        
+        // URL V1 STABLE (Au lieu de v1beta)
+        const url = `https://generativelanguage.googleapis.com/v1/models/${MODEL}:generateContent?key=${API_KEY}`;
 
         try {
             const response = await fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    contents: [{ parts: [{ text: "Réponse courte pour entretien : " + text }] }]
+                    contents: [{ parts: [{ text: "Réponse courte pour un entretien : " + text }] }]
                 })
             });
 
             const data = await response.json();
+
             if (response.ok && data.candidates) {
                 const result = data.candidates[0].content.parts[0].text;
                 aiResponse.innerText = result;
+                
                 // Synthèse Vocale
+                window.speechSynthesis.cancel();
                 const speech = new SpeechSynthesisUtterance(result);
                 speech.lang = 'fr-FR';
                 window.speechSynthesis.speak(speech);
             } else {
-                debug.innerText = "Erreur : " + (data.error ? data.error.message : "Inconnue");
-                debug.style.display = "block";
+                throw new Error(data.error ? data.error.message : "Erreur de réponse");
             }
         } catch (e) {
-            debug.innerText = "Erreur réseau.";
+            debug.innerText = "ERREUR : " + e.message;
             debug.style.display = "block";
+            aiResponse.innerText = "L'IA n'a pas pu répondre.";
+        } finally {
+            btn.disabled = false;
+            btn.innerText = "🎙️ CLIQUEZ ET PARLEZ";
+            btn.style.background = "#4bb543";
         }
-        btn.disabled = false;
-        btn.innerText = "🎙️ CLIQUEZ ET PARLEZ";
-        btn.style.background = "#4bb543";
     }
 
-    // LE BOUTON : On crée la reconnaissance AU MOMENT du clic
     btn.onclick = () => {
         const Speech = window.SpeechRecognition || window.webkitSpeechRecognition;
-        
-        if (!Speech) {
-            alert("Votre navigateur ne supporte pas le micro (Utilisez Chrome).");
-            return;
-        }
+        if (!Speech) return alert("Navigateur non compatible.");
 
         const recognition = new Speech();
         recognition.lang = 'fr-FR';
         
         recognition.onstart = () => {
-            btn.innerText = "ÉCOUTE EN COURS...";
+            btn.innerText = "ÉCOUTE...";
             btn.style.background = "#cc0000";
             btn.disabled = true;
         };
@@ -92,13 +95,15 @@
             askGemini(transcript);
         };
 
-        recognition.onerror = (e) => {
-            console.error("Erreur Micro:", e.error);
+        recognition.onerror = () => {
             btn.disabled = false;
-            btn.innerText = "🎙️ ERREUR MICRO (Réessayer)";
+            btn.innerText = "🎙️ ERREUR (Réessayer)";
             btn.style.background = "#4bb543";
         };
 
         recognition.start();
     };
 </script>
+
+</body>
+</html>
