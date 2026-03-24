@@ -2,95 +2,81 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Copilot Entretien v5.0</title>
+    <title>Copilot Final Fix v6.1</title>
     <style>
-        body { background: #0f0f0f; color: white; font-family: sans-serif; text-align: center; padding: 50px; }
-        .card { background: #1a1a1a; padding: 30px; border-radius: 15px; border: 1px solid #333; max-width: 400px; margin: auto; }
-        button { width: 100%; padding: 15px; background: #28a745; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
-        button:disabled { background: #444; cursor: not-allowed; }
-        #ai-response { margin-top: 20px; padding: 15px; background: #222; border-radius: 8px; color: #00ff00; text-align: left; border-left: 4px solid #28a745; }
-        .err { color: #ff4444; font-size: 0.8em; margin-top: 10px; display: none; }
+        body { background: #000; color: #fff; font-family: sans-serif; text-align: center; padding: 20px; }
+        .box { border: 1px solid #333; padding: 20px; border-radius: 10px; background: #111; max-width: 450px; margin: auto; }
+        button { width: 100%; padding: 15px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
+        #res { margin-top: 20px; color: #0f0; min-height: 40px; text-align: left; }
+        .debug-panel { margin-top: 20px; font-size: 10px; color: #666; text-align: left; background: #050505; padding: 10px; border: 1px dashed #222; }
     </style>
 </head>
 <body>
 
-<div class="card">
-    <h2>Assistant v5.0</h2>
-    <button id="btn">🎙️ CLIQUEZ POUR PARLER</button>
-    <p id="output" style="color:#777">Prêt.</p>
-    <div id="ai-response">La réponse s'affichera ici.</div>
-    <div id="debug" class="err"></div>
+<div class="box">
+    <h3>Copilot v6.1</h3>
+    <button id="btn">🎙️ CLIQUEZ ET PARLEZ</button>
+    <div id="res">En attente de votre question...</div>
+    <div id="debug" class="debug-panel">Logs : Prêt.</div>
 </div>
 
 <script>
-    // --- CONFIGURATION FINALE ---
     const API_KEY = "AIzaSyBVzeqmNIWmuOL4IP6nts-BcUQi2Ch7Awk";
-    // gemini-pro est l'identifiant le plus compatible au monde
-    const MODEL = "gemini-pro"; 
-
     const btn = document.getElementById('btn');
-    const out = document.getElementById('output');
-    const res = document.getElementById('ai-response');
+    const res = document.getElementById('res');
     const debug = document.getElementById('debug');
 
     async function askGemini(text) {
-        res.innerText = "Réflexion...";
-        debug.style.display = "none";
+        btn.disabled = true;
+        res.innerText = "Analyse en cours...";
         
-        // URL v1beta avec models/gemini-pro
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${API_KEY}`;
-
         try {
-            const response = await fetch(url, {
+            // ÉTAPE 1 : Découverte automatique du modèle
+            debug.innerText = "Recherche de modèles disponibles...";
+            const listResp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${API_KEY}`);
+            const listData = await listResp.json();
+
+            if (!listData.models || listData.models.length === 0) {
+                throw new Error("Votre clé n'a accès à AUCUN modèle Gemini. Allez sur Google AI Studio.");
+            }
+
+            // On prend le premier modèle qui supporte la génération de contenu
+            const activeModel = listData.models.find(m => m.supportedGenerationMethods.includes("generateContent")).name;
+            debug.innerText = "Modèle utilisé : " + activeModel;
+
+            // ÉTAPE 2 : Envoi de la requête
+            const genUrl = `https://generativelanguage.googleapis.com/v1beta/${activeModel}:generateContent?key=${API_KEY}`;
+            const response = await fetch(genUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    contents: [{ parts: [{ text: "Réponse courte pour entretien : " + text }] }]
-                })
+                body: JSON.stringify({ contents: [{ parts: [{ text: "Réponds en une phrase : " + text }] }] })
             });
 
             const data = await response.json();
-
-            if (response.ok && data.candidates) {
+            if (response.ok) {
                 const aiTxt = data.candidates[0].content.parts[0].text;
                 res.innerText = aiTxt;
-                // Voix
-                const speech = new SpeechSynthesisUtterance(aiTxt);
-                speech.lang = 'fr-FR';
-                window.speechSynthesis.speak(speech);
+                window.speechSynthesis.speak(new SpeechSynthesisUtterance(aiTxt));
             } else {
-                throw new Error(data.error ? data.error.message : "Erreur de configuration");
+                throw new Error(data.error.message);
             }
         } catch (e) {
-            debug.innerText = "ERREUR : " + e.message;
-            debug.style.display = "block";
-            res.innerText = "L'IA n'a pas pu répondre.";
+            res.innerText = "Erreur fatale.";
+            debug.innerText = "LOG ERREUR : " + e.message;
         } finally {
             btn.disabled = false;
-            btn.innerText = "🎙️ CLIQUEZ POUR PARLER";
+            btn.innerText = "🎙️ CLIQUEZ ET PARLEZ";
         }
     }
 
     btn.onclick = () => {
         const Speech = window.SpeechRecognition || window.webkitSpeechRecognition;
         if (!Speech) return alert("Chrome requis.");
-
         const rec = new Speech();
         rec.lang = 'fr-FR';
-        
-        rec.onstart = () => {
-            btn.innerText = "ÉCOUTE...";
-            btn.disabled = true;
-        };
-
-        rec.onresult = (e) => {
-            const transcript = e.results[0][0].transcript;
-            out.innerText = "Vu : " + transcript;
-            askGemini(transcript);
-        };
-
-        rec.onerror = () => { btn.disabled = false; btn.innerText = "🎙️ ERREUR"; };
+        rec.onresult = (e) => askGemini(e.results[0][0].transcript);
         rec.start();
+        btn.innerText = "ÉCOUTE EN COURS...";
     };
 </script>
 
