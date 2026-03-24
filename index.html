@@ -39,34 +39,35 @@
     };
 
     async function askGemini(text) {
-        const API_KEY = "AIzaSyCWxtuSTP2zsRK7GfKUQesy8R3Z05KcqQY";
-        // ON ESSAIE LA VERSION V1 ET LE MODELE PRO POUR DEBLOQUER LA 404
-        const url = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-pro:generateContent?key=${API_KEY}`;
+    const API_KEY = "AIzaSyCWxtuSTP2zsRK7GfKUQesy8R3Z05KcqQY";
+    
+    // On repasse en v1beta pour le modèle flash qui est le plus compatible en gratuit
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`;
 
-        try {
-            const response = await fetch(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    contents: [{ parts: [{ text: "Réponse courte : " + text }] }]
-                })
-            });
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                contents: [{ parts: [{ text: "Réponse courte : " + text }] }]
+            })
+        });
 
-            const data = await response.json();
+        const data = await response.json();
 
-            if (response.ok) {
-                aiResponse.innerText = data.candidates[0].content.parts[0].text;
-                debugLog.innerText = ""; // On efface les erreurs si ça marche
-            } else {
-                // ICI ON CAPTURE L'ERREUR REELLE
-                const errMsg = data.error ? data.error.message : "Erreur inconnue";
-                debugLog.innerText = "ERREUR GOOGLE : " + errMsg;
-                console.error(data);
-            }
-        } catch (e) {
-            debugLog.innerText = "ERREUR RESEAU : " + e.message;
+        if (response.ok) {
+            // Ça va marcher ici !
+            const answer = data.candidates[0].content.parts[0].text;
+            aiResponse.innerText = answer;
+            debugLog.innerText = ""; 
+        } else {
+            // Affichage de l'erreur précise si Google change encore d'avis
+            debugLog.innerText = "ERREUR : " + (data.error ? data.error.message : "Inconnue");
         }
+    } catch (e) {
+        debugLog.innerText = "ERREUR RESEAU : " + e.message;
     }
+}
 
     startBtn.onclick = () => {
         recognition.start();
