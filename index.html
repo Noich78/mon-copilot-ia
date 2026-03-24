@@ -1,33 +1,90 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Assistant Entretien Pro</title>
+    <style>
+        body { font-family: sans-serif; background: #121212; color: white; padding: 20px; display: flex; justify-content: center; }
+        .card { background: #1e1e1e; padding: 20px; border-radius: 12px; border: 1px solid #333; width: 100%; max-width: 450px; text-align: center; }
+        #start-btn { width: 100%; padding: 15px; background: #4bb543; border: none; color: white; cursor: pointer; border-radius: 8px; font-weight: bold; }
+        #start-btn:disabled { background: #444; }
+        #ai-response { margin-top: 20px; padding: 15px; background: #2d2d2d; border-radius: 8px; color: #00ff00; min-height: 40px; text-align: left; border-left: 4px solid #4bb543; }
+        #output { color: #888; font-size: 0.9em; margin: 15px 0; font-style: italic; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h2>Copilot Entretien</h2>
+    <button id="start-btn">🎙️ PARLER MAINTENANT</button>
+    <div id="output">Cliquez pour poser une question...</div>
+    <div id="ai-response">La réponse s'affichera ici.</div>
+</div>
+
 <script>
-    // REMPLACEZ UNIQUEMENT CETTE LIGNE AVEC LA CLÉ TOUTE NEUVE
+    const startBtn = document.getElementById('start-btn');
+    const output = document.getElementById('output');
+    const aiResponse = document.getElementById('ai-response');
+
+    // CONFIGURATION : METS TA NOUVELLE CLÉ ICI
     const API_KEY = "AIzaSyDIigeAGI3QGGBb6LrottjEbIwuVAaGwgY"; 
-    const MODEL_ID = "gemini-1.5-flash"; 
+    const MODEL_ID = "gemini-1.5-flash";
 
-    async function askGemini(text) {
-        // Cette URL est la syntaxe exacte exigée par Google
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_ID}:generateContent?key=${API_KEY}`;
-        
-        try {
-            const response = await fetch(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    contents: [{ parts: [{ text: "Réponds très brièvement : " + text }] }]
-                })
-            });
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    
+    if (!SpeechRecognition) {
+        output.innerText = "Navigateur non compatible (Utilisez Chrome).";
+    } else {
+        const recognition = new SpeechRecognition();
+        recognition.lang = 'fr-FR';
 
-            const data = await response.json();
-            if (response.ok) {
-                const aiText = data.candidates[0].content.parts[0].text;
-                document.getElementById('ai-response').innerText = aiText;
-                window.speechSynthesis.speak(new SpeechSynthesisUtterance(aiText));
-            } else {
-                console.error("Erreur API:", data.error.message);
-                document.getElementById('debug-log').innerText = data.error.message;
-                document.getElementById('debug-log').style.display = "block";
+        recognition.onresult = (event) => {
+            const transcript = event.results[0][0].transcript;
+            output.innerText = "Vous : " + transcript;
+            askGemini(transcript);
+        };
+
+        async function askGemini(text) {
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_ID}:generateContent?key=${API_KEY}`;
+            aiResponse.innerText = "Réflexion...";
+            startBtn.disabled = true;
+
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: "Réponse très courte pour entretien : " + text }] }]
+                    })
+                });
+
+                const data = await response.json();
+                if (response.ok && data.candidates) {
+                    const aiText = data.candidates[0].content.parts[0].text;
+                    aiResponse.innerText = aiText;
+                    
+                    // Synthèse vocale
+                    const msg = new SpeechSynthesisUtterance(aiText);
+                    msg.lang = 'fr-FR';
+                    window.speechSynthesis.speak(msg);
+                } else {
+                    aiResponse.innerText = "Erreur : " + (data.error ? data.error.message : "Inconnue");
+                }
+            } catch (e) {
+                aiResponse.innerText = "Erreur réseau.";
+            } finally {
+                setTimeout(() => {
+                    startBtn.disabled = false;
+                    startBtn.innerText = "🎙️ PARLER MAINTENANT";
+                }, 5000); // 5 secondes de pause
             }
-        } catch (e) {
-            console.error("Erreur Réseau:", e);
         }
+
+        startBtn.onclick = () => {
+            recognition.start();
+            startBtn.innerText = "ÉCOUTE...";
+        };
     }
 </script>
+</body>
+</html>
