@@ -2,74 +2,76 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Copilot Entretien Pro</title>
+    <title>Assistant Backup</title>
     <style>
-        body { font-family: sans-serif; display: flex; justify-content: center; padding: 20px; background: #f4f7f6; }
-        .card { background: white; padding: 20px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 100%; max-width: 500px; }
-        #start-btn { width: 100%; padding: 15px; border: none; border-radius: 10px; background: #007bff; color: white; font-weight: bold; cursor: pointer; }
-        #output { margin-top: 15px; padding: 10px; background: #eee; border-radius: 5px; min-height: 50px; font-size: 0.9em; }
-        #ai-response { margin-top: 15px; padding: 15px; background: #d4edda; border-left: 5px solid #28a745; border-radius: 5px; font-weight: bold; }
+        body { font-family: sans-serif; padding: 20px; background: #121212; color: white; }
+        .card { background: #1e1e1e; padding: 20px; border-radius: 10px; border: 1px solid #333; }
+        #start-btn { width: 100%; padding: 15px; background: #4bb543; border: none; color: white; cursor: pointer; border-radius: 5px; font-weight: bold; }
+        #ai-response { margin-top: 20px; padding: 15px; background: #2d2d2d; border-radius: 5px; color: #00ff00; font-family: monospace; }
+        .error-log { color: #ff4444; font-size: 0.8em; margin-top: 10px; }
     </style>
 </head>
 <body>
 
 <div class="card">
-    <h2>Assistant Live</h2>
-    <button id="start-btn">Activer le Micro</button>
-    <div id="output">J'écoute...</div>
-    <div id="ai-response">Les conseils de l'IA apparaîtront ici.</div>
+    <h3>Copilot v3 (Stable)</h3>
+    <button id="start-btn">Lancer le micro</button>
+    <div id="output" style="margin-top:10px; color:#aaa;">J'écoute...</div>
+    <div id="ai-response">En attente...</div>
+    <div id="debug-log" class="error-log"></div>
 </div>
 
 <script>
     const startBtn = document.getElementById('start-btn');
     const output = document.getElementById('output');
     const aiResponse = document.getElementById('ai-response');
+    const debugLog = document.getElementById('debug-log');
 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     const recognition = new SpeechRecognition();
     recognition.lang = 'fr-FR';
     recognition.continuous = true;
-    recognition.interimResults = false;
 
     recognition.onresult = (event) => {
         const transcript = event.results[event.results.length - 1][0].transcript;
-        output.innerText = transcript;
+        output.innerText = "Entendu : " + transcript;
         askGemini(transcript);
     };
 
     async function askGemini(text) {
-        // TA CLÉ API
         const API_KEY = "AIzaSyCWxtuSTP2zsRK7GfKUQesy8R3Z05KcqQY";
-        
-        // NOUVELLE URL STABLE
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`;
+        // ON ESSAIE LA VERSION V1 ET LE MODELE PRO POUR DEBLOQUER LA 404
+        const url = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-pro:generateContent?key=${API_KEY}`;
 
         try {
             const response = await fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    contents: [{ parts: [{ text: "Donne une réponse très courte à cette question d'entretien : " + text }] }]
+                    contents: [{ parts: [{ text: "Réponse courte : " + text }] }]
                 })
             });
 
             const data = await response.json();
-            
-            if (data.candidates && data.candidates[0].content) {
+
+            if (response.ok) {
                 aiResponse.innerText = data.candidates[0].content.parts[0].text;
+                debugLog.innerText = ""; // On efface les erreurs si ça marche
             } else {
-                console.error("Erreur API :", data);
-                aiResponse.innerText = "L'IA n'a pas pu répondre.";
+                // ICI ON CAPTURE L'ERREUR REELLE
+                const errMsg = data.error ? data.error.message : "Erreur inconnue";
+                debugLog.innerText = "ERREUR GOOGLE : " + errMsg;
+                console.error(data);
             }
-        } catch (error) {
-            console.error("Erreur Fetch :", error);
+        } catch (e) {
+            debugLog.innerText = "ERREUR RESEAU : " + e.message;
         }
     }
 
     startBtn.onclick = () => {
         recognition.start();
-        startBtn.innerText = "🔴 Micro Actif";
-        startBtn.style.background = "#dc3545";
+        startBtn.innerText = "ÉCOUTE EN COURS...";
+        startBtn.style.background = "#cc0000";
     };
 </script>
 </body>
