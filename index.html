@@ -2,59 +2,116 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mon Copilot Entretien</title>
     <style>
-        body { font-family: sans-serif; padding: 20px; background: #f4f4f4; }
-        #output { border: 1px solid #ccc; padding: 10px; height: 200px; overflow-y: auto; background: white; margin-bottom: 10px; }
-        #ai-response { background: #e3f2fd; padding: 15px; border-radius: 8px; font-weight: bold; color: #1565c0; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; background: #f0f2f5; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        h1 { font-size: 1.5rem; text-align: center; color: #1a73e8; }
+        #start-btn { width: 100%; padding: 15px; font-size: 1rem; cursor: pointer; border: none; border-radius: 8px; background: #1a73e8; color: white; font-weight: bold; transition: background 0.3s; }
+        #start-btn:hover { background: #1557b0; }
+        #start-btn.active { background: #d93025; }
+        .box-label { font-weight: bold; margin-top: 20px; display: block; font-size: 0.9rem; color: #666; }
+        #output { border: 1px solid #ddd; padding: 10px; height: 100px; overflow-y: auto; background: #fafafa; border-radius: 8px; margin-top: 5px; font-size: 0.9rem; }
+        #ai-response { margin-top: 10px; padding: 15px; background: #e8f0fe; border-left: 5px solid #1a73e8; border-radius: 4px; min-height: 50px; font-weight: 500; line-height: 1.4; }
+        .status { font-size: 0.8rem; text-align: center; margin-top: 10px; color: #888; }
     </style>
 </head>
 <body>
+
+<div class="container">
     <h1>Assistant Temps Réel</h1>
     <button id="start-btn">Démarrer l'écoute</button>
-    <p>Transcription en direct :</p>
-    <div id="output"></div>
-    <p>Conseils de l'IA :</p>
-    <div id="ai-response">En attente de la question...</div>
+    <div id="status" class="status">Prêt</div>
 
-    <script>
-        const startBtn = document.getElementById('start-btn');
-        const output = document.getElementById('output');
-        const aiResponse = document.getElementById('ai-response');
+    <span class="box-label">Ce que j'entends :</span>
+    <div id="output">...</div>
 
-        // Initialisation de la reconnaissance vocale (Gratuit via le navigateur)
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        const recognition = new SpeechRecognition();
-        recognition.lang = 'fr-FR';
-        recognition.continuous = true;
+    <span class="box-label">Conseil de l'IA :</span>
+    <div id="ai-response">En attente d'une question...</div>
+</div>
 
-        recognition.onresult = (event) => {
-            const transcript = event.results[event.results.length - 1][0].transcript;
-            output.innerText += " " + transcript;
-            
-            // Si la phrase semble être une question, on demande à Gemini
-            if (transcript.length > 20) {
-                askGemini(transcript);
-            }
+<script>
+    const startBtn = document.getElementById('start-btn');
+    const output = document.getElementById('output');
+    const aiResponse = document.getElementById('ai-response');
+    const status = document.getElementById('status');
+
+    // Configuration de la reconnaissance vocale
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
+
+    recognition.lang = 'fr-FR';
+    recognition.continuous = true;
+    recognition.interimResults = false; // On ne prend que les phrases complètes pour éviter les bugs
+
+    recognition.onresult = (event) => {
+        const current = event.resultIndex;
+        const transcript = event.results[current][0].transcript.trim();
+        
+        output.innerHTML = "<strong>Moi :</strong> " + transcript;
+        console.log("Texte capté :", transcript);
+
+        // On n'envoie à l'IA que si la phrase est assez longue
+        if (transcript.length > 5) {
+            askGemini(transcript);
+        }
+    };
+
+    async function askGemini(text) {
+        // TA CLÉ API VÉRIFIÉE
+        const API_KEY = "AIzaSyCWxtuSTP2zsRK7GfKUQesy8R3Z05KcqQY"; 
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`;
+        
+        aiResponse.innerText = "Réflexion en cours...";
+
+        const payload = {
+            contents: [{
+                parts: [{ text: "Réponds de façon très concise pour un entretien d'embauche : " + text }]
+            }]
         };
 
-        async function askGemini(text) {
-            const API_KEY = "AIzaSyCWxtuSTP2zsRK7GfKUQesy8R3Z05KcqQY";
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`;
-            
+        try {
             const response = await fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    contents: [{ parts: [{ text: `Tu es un assistant d'entretien. Réponds de manière concise (max 2 phrases) à cette question posée par le recruteur : ${text}` }] }]
-                })
+                body: JSON.stringify(payload)
             });
 
             const data = await response.json();
-            aiResponse.innerText = data.candidates[0].content.parts[0].text;
-        }
 
-        startBtn.onclick = () => recognition.start();
-    </script>
+            if (response.ok) {
+                const answer = data.candidates[0].content.parts[0].text;
+                aiResponse.innerText = answer;
+            } else {
+                console.error("Erreur API:", data);
+                aiResponse.innerText = "Erreur Google : " + (data.error ? data.error.message : "Inconnue");
+            }
+        } catch (error) {
+            console.error("Erreur réseau:", error);
+            aiResponse.innerText = "Erreur de connexion.";
+        }
+    }
+
+    startBtn.onclick = () => {
+        try {
+            recognition.start();
+            startBtn.innerText = "Micro en écoute...";
+            startBtn.classList.add('active');
+            status.innerText = "L'IA vous écoute...";
+        } catch (e) {
+            recognition.stop();
+            startBtn.innerText = "Démarrer l'écoute";
+            startBtn.classList.remove('active');
+            status.innerText = "Micro arrêté";
+        }
+    };
+
+    recognition.onerror = (event) => {
+        console.error("Erreur reco vocale:", event.error);
+        status.innerText = "Erreur micro : " + event.error;
+    };
+</script>
+
 </body>
 </html>
