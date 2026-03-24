@@ -2,22 +2,24 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Assistant Backup</title>
+    <title>Assistant Backup v3.1</title>
     <style>
-        body { font-family: sans-serif; padding: 20px; background: #121212; color: white; }
-        .card { background: #1e1e1e; padding: 20px; border-radius: 10px; border: 1px solid #333; }
-        #start-btn { width: 100%; padding: 15px; background: #4bb543; border: none; color: white; cursor: pointer; border-radius: 5px; font-weight: bold; }
-        #ai-response { margin-top: 20px; padding: 15px; background: #2d2d2d; border-radius: 5px; color: #00ff00; font-family: monospace; }
-        .error-log { color: #ff4444; font-size: 0.8em; margin-top: 10px; }
+        body { font-family: 'Segoe UI', sans-serif; padding: 20px; background: #121212; color: white; display: flex; justify-content: center; }
+        .card { background: #1e1e1e; padding: 25px; border-radius: 12px; border: 1px solid #333; width: 100%; max-width: 500px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        #start-btn { width: 100%; padding: 15px; background: #4bb543; border: none; color: white; cursor: pointer; border-radius: 6px; font-weight: bold; transition: 0.3s; }
+        #start-btn:hover { opacity: 0.9; }
+        #output { margin-top: 15px; color: #aaa; font-style: italic; min-height: 20px; }
+        #ai-response { margin-top: 20px; padding: 15px; background: #2d2d2d; border-radius: 5px; color: #00ff00; font-family: 'Consolas', monospace; line-height: 1.5; border-left: 4px solid #4bb543; }
+        .error-log { color: #ff4444; font-size: 0.85em; margin-top: 15px; padding: 10px; border: 1px dashed #ff4444; display: none; }
     </style>
 </head>
 <body>
 
 <div class="card">
-    <h3>Copilot v3 (Stable)</h3>
+    <h3 style="margin-top:0;">Copilot v3.1 (Stable 2026)</h3>
     <button id="start-btn">Lancer le micro</button>
-    <div id="output" style="margin-top:10px; color:#aaa;">J'écoute...</div>
-    <div id="ai-response">En attente...</div>
+    <div id="output">En attente de voix...</div>
+    <div id="ai-response">Les réponses s'afficheront ici.</div>
     <div id="debug-log" class="error-log"></div>
 </div>
 
@@ -27,54 +29,70 @@
     const aiResponse = document.getElementById('ai-response');
     const debugLog = document.getElementById('debug-log');
 
+    // Configuration de la reconnaissance vocale
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+        alert("Désolé, votre navigateur ne supporte pas la reconnaissance vocale.");
+    }
+    
     const recognition = new SpeechRecognition();
     recognition.lang = 'fr-FR';
-    recognition.continuous = true;
+    recognition.continuous = false; // Mode court pour éviter les bugs de boucle
 
     recognition.onresult = (event) => {
-        const transcript = event.results[event.results.length - 1][0].transcript;
+        const transcript = event.results[0][0].transcript;
         output.innerText = "Entendu : " + transcript;
         askGemini(transcript);
+        resetButton();
     };
 
-   async function askGemini(text) {
-    const API_KEY = "AIzaSyCWxtuSTP2zsRK7GfKUQesy8R3Z05KcqQY";
-    
-    // L'URL exacte pour Gemini 1.5 Flash
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`;
+    recognition.onerror = () => resetButton();
 
-    try {
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                contents: [{ 
-                    parts: [{ text: "Réponds de façon très concise et professionnelle pour un entretien : " + text }] 
-                }]
-            })
-        });
-
-        const data = await response.json();
-
-        if (response.ok && data.candidates) {
-            // Affichage du résultat
-            const aiText = data.candidates[0].content.parts[0].text;
-            aiResponse.innerText = aiText;
-            debugLog.innerText = ""; // On nettoie les erreurs précédentes
-        } else {
-            // Affichage de l'erreur (Quota ou Géographie)
-            const errorMsg = data.error ? data.error.message : "Erreur de réponse";
-            debugLog.innerText = "Statut : " + errorMsg;
-            
-            if (errorMsg.includes("quota")) {
-                debugLog.innerText += " -> ACTIVE TON VPN (USA/UK) !";
-            }
-        }
-    } catch (e) {
-        debugLog.innerText = "ERREUR RÉSEAU : " + e.message;
+    function resetButton() {
+        startBtn.innerText = "Lancer le micro";
+        startBtn.style.background = "#4bb543";
     }
-}
+
+    async function askGemini(text) {
+        // MISE À JOUR : Utilisation du modèle flash le plus récent
+        const MODEL = "gemini-2.5-flash"; // Ou "gemini-1.5-flash-latest"
+        const API_KEY = "AIzaSyCGswZk1ZJZalmAGZVY3Sz9D0cIUPisObk"; // Remplacez par votre clé
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${API_KEY}`;
+
+        aiResponse.innerText = "Réflexion en cours...";
+        debugLog.style.display = "none";
+
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{ 
+                        parts: [{ text: "Réponds de façon très concise (max 20 mots) et professionnelle pour un entretien : " + text }] 
+                    }]
+                })
+            });
+
+            const data = await response.json();
+
+            if (response.ok && data.candidates && data.candidates[0].content) {
+                const aiText = data.candidates[0].content.parts[0].text;
+                aiResponse.innerText = aiText;
+            } else {
+                debugLog.style.display = "block";
+                const errorMsg = data.error ? data.error.message : "Structure de réponse inconnue";
+                debugLog.innerText = "Erreur API : " + errorMsg;
+                
+                // Si l'erreur mentionne que le modèle n'existe pas, essayez 'gemini-1.5-flash-latest'
+                if (errorMsg.includes("not found")) {
+                    debugLog.innerText += "\nAstuce : Remplacez MODEL par 'gemini-1.5-flash-latest' dans le code.";
+                }
+            }
+        } catch (e) {
+            debugLog.style.display = "block";
+            debugLog.innerText = "ERREUR RÉSEAU : " + e.message;
+        }
+    }
 
     startBtn.onclick = () => {
         recognition.start();
