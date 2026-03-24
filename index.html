@@ -1,69 +1,109 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Assistant Entretien - Stable</title>
+    <style>
+        body { background: #121212; color: #eee; font-family: sans-serif; display: flex; justify-content: center; padding: 20px; }
+        .card { background: #1e1e1e; padding: 25px; border-radius: 15px; width: 100%; max-width: 400px; border: 1px solid #333; text-align: center; }
+        button { width: 100%; padding: 15px; background: #4bb543; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
+        button:disabled { background: #444; }
+        #res { margin-top: 20px; padding: 15px; background: #2d2d2d; border-radius: 8px; color: #00ff00; text-align: left; min-height: 50px; }
+        .error-msg { color: #ff4444; font-size: 0.8em; margin-top: 10px; display: none; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h2>Copilot v3.8</h2>
+    <button id="btn">🎙️ TESTER LE MICRO</button>
+    <p id="status" style="color: #888;">Prêt.</p>
+    <div id="res">La réponse s'affichera ici.</div>
+    <div id="debug" class="error-msg"></div>
+</div>
+
 <script>
+    // --- CONFIGURATION ---
     const API_KEY = "AIzaSyBVzeqmNIWmuOL4IP6nts-BcUQi2Ch7Awk";
-    
+
     const btn = document.getElementById('btn');
-    const out = document.getElementById('output');
+    const status = document.getElementById('status');
     const res = document.getElementById('res');
+    const debug = document.getElementById('debug');
 
+    // Sécurité anti-page blanche : on vérifie le support micro immédiatement
     const Speech = window.SpeechRecognition || window.webkitSpeechRecognition;
-    const rec = new Speech ? new Speech() : null;
-
-    if (rec) {
-        rec.lang = 'fr-FR';
-        rec.onresult = (e) => {
-            const txt = e.results[0][0].transcript;
-            out.innerText = "Entendu : " + txt;
-            askGemini(txt);
-        };
+    if (!Speech) {
+        status.innerText = "ERREUR : Navigateur non compatible.";
     }
 
     async function askGemini(prompt) {
-        res.innerText = "Recherche du meilleur modèle...";
+        res.innerText = "Analyse en cours...";
         btn.disabled = true;
+        debug.style.display = "none";
+
+        // ON FORCE LE MODÈLE SANS PASSER PAR LA LISTE (plus stable pour éviter la page blanche)
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`;
 
         try {
-            // ÉTAPE 1 : On demande la liste des modèles supportés par TA clé
-            const listUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${API_KEY}`;
-            const listResponse = await fetch(listUrl);
-            const listData = await listResponse.json();
-            
-            // On cherche un modèle qui contient "flash" ou "pro" dans la liste
-            const availableModel = listData.models.find(m => 
-                m.supportedGenerationMethods.includes("generateContent")
-            );
-
-            if (!availableModel) throw new Error("Aucun modèle trouvé pour cette clé.");
-            
-            const modelName = availableModel.name; // C'est le nom exact (ex: models/gemini-1.5-flash-8b)
-            res.innerText = "Modèle trouvé : " + modelName + ". Réflexion...";
-
-            // ÉTAPE 2 : On fait la vraie requête avec le nom trouvé
-            const url = `https://generativelanguage.googleapis.com/v1beta/${modelName}:generateContent?key=${API_KEY}`;
-            
             const response = await fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    contents: [{ parts: [{ text: "Réponds brièvement en français : " + prompt }] }]
+                    contents: [{ parts: [{ text: "Réponds très brièvement en une phrase : " + prompt }] }]
                 })
             });
 
             const data = await response.json();
-            if (response.ok) {
+
+            if (response.ok && data.candidates && data.candidates[0].content) {
                 const aiTxt = data.candidates[0].content.parts[0].text;
                 res.innerText = aiTxt;
-                window.speechSynthesis.speak(new SpeechSynthesisUtterance(aiTxt));
+                // Voix
+                const speech = new SpeechSynthesisUtterance(aiTxt);
+                speech.lang = 'fr-FR';
+                window.speechSynthesis.speak(speech);
             } else {
-                res.innerText = "Erreur : " + data.error.message;
+                // Si ça renvoie une erreur (ex: 404), on l'affiche proprement
+                const errorMsg = data.error ? data.error.message : "Erreur inconnue de l'API";
+                res.innerText = "L'IA n'a pas pu répondre.";
+                debug.innerText = "Détail : " + errorMsg;
+                debug.style.display = "block";
             }
         } catch (err) {
-            res.innerText = "ERREUR : " + err.message;
-            console.error(err);
+            res.innerText = "Erreur de connexion.";
+            debug.innerText = err.message;
+            debug.style.display = "block";
         } finally {
             btn.disabled = false;
-            btn.innerText = "🎙️ CLIQUEZ POUR PARLER";
+            btn.innerText = "🎙️ TESTER LE MICRO";
         }
     }
 
-    btn.onclick = () => { rec.start(); btn.innerText = "ÉCOUTE..."; };
+    // Lancement du micro
+    btn.onclick = () => {
+        try {
+            const rec = new Speech();
+            rec.lang = 'fr-FR';
+            rec.start();
+            btn.innerText = "ÉCOUTE...";
+            
+            rec.onresult = (e) => {
+                const txt = e.results[0][0].transcript;
+                status.innerText = "Entendu : " + txt;
+                askGemini(txt);
+            };
+
+            rec.onerror = (e) => {
+                status.innerText = "Erreur micro : " + e.error;
+                btn.disabled = false;
+                btn.innerText = "🎙️ TESTER LE MICRO";
+            };
+        } catch (e) {
+            alert("Erreur micro : " + e.message);
+        }
+    };
 </script>
+
+</body>
+</html>
