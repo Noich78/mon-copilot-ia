@@ -71,10 +71,9 @@
         debugLog.style.display = "block";
     };
 
-    // --- APPEL API GEMINI ---
-    async function askGemini(text) {
-        // Changement vers l'endpoint v1 STABLE
-        const url = `https://generativelanguage.googleapis.com/v1/models/${MODEL_ID}:generateContent?key=${API_KEY}`;
+   async function askGemini(text) {
+        // AJOUT DE "models/" AVANT LE NOM DU MODÈLE
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`;
         
         aiResponse.innerText = "Réflexion...";
         startBtn.disabled = true;
@@ -85,23 +84,22 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     contents: [{ 
-                        parts: [{ text: "Réponds en une seule phrase courte et percutante pour un entretien : " + text }] 
+                        parts: [{ text: "Réponds en une seule phrase courte pour un entretien : " + text }] 
                     }]
                 })
             });
 
             const data = await response.json();
 
+            // Gestion spécifique de l'erreur 404
             if (response.status === 404) {
-                throw new Error("Modèle introuvable. Vérifiez MODEL_ID.");
-            } else if (response.status === 429) {
-                throw new Error("Quota dépassé. Attendez 30 secondes.");
+                throw new Error("L'API ne trouve pas ce modèle. Vérifiez si 'models/' est bien dans l'URL.");
             }
 
             if (response.ok && data.candidates) {
                 const aiText = data.candidates[0].content.parts[0].text;
                 aiResponse.innerText = aiText;
-                speak(aiText); // Synthèse vocale
+                speak(aiText);
             } else {
                 throw new Error(data.error ? data.error.message : "Erreur API");
             }
