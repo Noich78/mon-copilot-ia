@@ -25,27 +25,17 @@
 </div>
 
 <script>
-    // --- CONFIGURATION ---
-    const API_KEY = "AIzaSyBVzeqmNIWmuOL4IP6nts-BcUQi2Ch7Awk";
-    const MODEL = "gemini-1.5-flash"; 
-
     const btn = document.getElementById('btn');
     const output = document.getElementById('output');
     const aiResponse = document.getElementById('ai-response');
     const debug = document.getElementById('debug');
 
-    // Vérification du micro
-    const Speech = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!Speech) {
-        output.innerText = "Navigateur non compatible (Utilisez Chrome).";
-    }
+    const API_KEY = "AIzaSyBVzeqmNIWmuOL4IP6nts-BcUQi2Ch7Awk";
+    const MODEL = "gemini-1.5-flash"; 
 
+    // Fonction pour envoyer le texte à Gemini
     async function askGemini(text) {
         aiResponse.innerText = "Réflexion...";
-        debug.style.display = "none";
-        btn.disabled = true;
-
-        // URL stable v1beta
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${API_KEY}`;
 
         try {
@@ -53,11 +43,62 @@
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    contents: [{ parts: [{ text: "Réponds très brièvement (max 2 phrases) pour un entretien : " + text }] }]
+                    contents: [{ parts: [{ text: "Réponse courte pour entretien : " + text }] }]
                 })
             });
 
             const data = await response.json();
-
             if (response.ok && data.candidates) {
                 const result = data.candidates[0].content.parts[0].text;
+                aiResponse.innerText = result;
+                // Synthèse Vocale
+                const speech = new SpeechSynthesisUtterance(result);
+                speech.lang = 'fr-FR';
+                window.speechSynthesis.speak(speech);
+            } else {
+                debug.innerText = "Erreur : " + (data.error ? data.error.message : "Inconnue");
+                debug.style.display = "block";
+            }
+        } catch (e) {
+            debug.innerText = "Erreur réseau.";
+            debug.style.display = "block";
+        }
+        btn.disabled = false;
+        btn.innerText = "🎙️ CLIQUEZ ET PARLEZ";
+        btn.style.background = "#4bb543";
+    }
+
+    // LE BOUTON : On crée la reconnaissance AU MOMENT du clic
+    btn.onclick = () => {
+        const Speech = window.SpeechRecognition || window.webkitSpeechRecognition;
+        
+        if (!Speech) {
+            alert("Votre navigateur ne supporte pas le micro (Utilisez Chrome).");
+            return;
+        }
+
+        const recognition = new Speech();
+        recognition.lang = 'fr-FR';
+        
+        recognition.onstart = () => {
+            btn.innerText = "ÉCOUTE EN COURS...";
+            btn.style.background = "#cc0000";
+            btn.disabled = true;
+        };
+
+        recognition.onresult = (event) => {
+            const transcript = event.results[0][0].transcript;
+            output.innerText = "Vous : " + transcript;
+            askGemini(transcript);
+        };
+
+        recognition.onerror = (e) => {
+            console.error("Erreur Micro:", e.error);
+            btn.disabled = false;
+            btn.innerText = "🎙️ ERREUR MICRO (Réessayer)";
+            btn.style.background = "#4bb543";
+        };
+
+        recognition.start();
+    };
+</script>
