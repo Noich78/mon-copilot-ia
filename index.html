@@ -1,95 +1,33 @@
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-    <meta charset="UTF-8">
-    <title>Copilot Entretien v3.4</title>
-    <style>
-        body { font-family: sans-serif; padding: 20px; background: #121212; color: white; display: flex; justify-content: center; }
-        .card { background: #1e1e1e; padding: 25px; border-radius: 12px; border: 1px solid #333; width: 100%; max-width: 500px; }
-        #start-btn { width: 100%; padding: 15px; background: #4bb543; border: none; color: white; cursor: pointer; border-radius: 8px; font-weight: bold; }
-        #start-btn:disabled { background: #444; }
-        #ai-response { margin-top: 20px; padding: 15px; background: #2d2d2d; border-radius: 8px; color: #00ff00; border-left: 4px solid #4bb543; min-height: 40px; }
-        .error-log { color: #ff4444; font-size: 0.8em; margin-top: 15px; display: none; }
-    </style>
-</head>
-<body>
-
-<div class="card">
-    <h3>Copilot v3.4 (Force Connect)</h3>
-    <button id="start-btn">🎙️ CLIQUER ET PARLER</button>
-    <div id="output" style="margin-top:15px; color:#999;"></div>
-    <div id="ai-response">En attente...</div>
-    <div id="debug-log" class="error-log"></div>
-</div>
-
 <script>
-    const startBtn = document.getElementById('start-btn');
-    const output = document.getElementById('output');
-    const aiResponse = document.getElementById('ai-response');
-    const debugLog = document.getElementById('debug-log');
-
-    // CONFIGURATION FORCEE
-    const API_KEY = "AIzaSyCGswZk1ZJZalmAGZVY3Sz9D0cIUPisObk"; 
-    // On change pour gemini-pro qui est l'alias le plus stable
-    const MODEL_ID = "gemini-pro"; 
-
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    const recognition = new SpeechRecognition();
-    recognition.lang = 'fr-FR';
-
-    recognition.onresult = (event) => {
-        const transcript = event.results[0][0].transcript;
-        output.innerText = "Entendu : " + transcript;
-        askGemini(transcript);
-    };
+    // REMPLACEZ UNIQUEMENT CETTE LIGNE AVEC LA CLÉ TOUTE NEUVE
+    const API_KEY = "AIzaSyDIigeAGI3QGGBb6LrottjEbIwuVAaGwgY"; 
+    const MODEL_ID = "gemini-1.5-flash"; 
 
     async function askGemini(text) {
-        // Utilisation de l'endpoint v1 stable (souvent plus fiable que v1beta pour gemini-pro)
-        const url = `https://generativelanguage.googleapis.com/v1/models/${MODEL_ID}:generateContent?key=${API_KEY}`;
+        // Cette URL est la syntaxe exacte exigée par Google
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_ID}:generateContent?key=${API_KEY}`;
         
-        aiResponse.innerText = "Réflexion...";
-        startBtn.disabled = true;
-
         try {
             const response = await fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    contents: [{ parts: [{ text: "Réponse courte pour entretien : " + text }] }]
+                    contents: [{ parts: [{ text: "Réponds très brièvement : " + text }] }]
                 })
             });
 
             const data = await response.json();
-
-            if (response.ok && data.candidates) {
+            if (response.ok) {
                 const aiText = data.candidates[0].content.parts[0].text;
-                aiResponse.innerText = aiText;
-                
-                // Audio
-                window.speechSynthesis.cancel();
+                document.getElementById('ai-response').innerText = aiText;
                 window.speechSynthesis.speak(new SpeechSynthesisUtterance(aiText));
             } else {
-                // Si gemini-pro échoue aussi, on affiche le détail technique
-                const errorDetail = data.error ? data.error.message : "Erreur Inconnue";
-                throw new Error(errorDetail);
+                console.error("Erreur API:", data.error.message);
+                document.getElementById('debug-log').innerText = data.error.message;
+                document.getElementById('debug-log').style.display = "block";
             }
         } catch (e) {
-            debugLog.style.display = "block";
-            debugLog.innerText = "LOG : " + e.message;
-            aiResponse.innerText = "Erreur de connexion.";
-        } finally {
-            // Attente de 10s pour le quota
-            setTimeout(() => {
-                startBtn.disabled = false;
-                startBtn.innerText = "🎙️ CLIQUER ET PARLER";
-            }, 10000);
+            console.error("Erreur Réseau:", e);
         }
     }
-
-    startBtn.onclick = () => {
-        recognition.start();
-        startBtn.innerText = "ÉCOUTE...";
-    };
 </script>
-</body>
-</html>
