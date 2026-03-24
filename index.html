@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Mon Copilot Entretien</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f4f4f4; }
+        #output { border: 1px solid #ccc; padding: 10px; height: 200px; overflow-y: auto; background: white; margin-bottom: 10px; }
+        #ai-response { background: #e3f2fd; padding: 15px; border-radius: 8px; font-weight: bold; color: #1565c0; }
+    </style>
+</head>
+<body>
+    <h1>Assistant Temps Réel</h1>
+    <button id="start-btn">Démarrer l'écoute</button>
+    <p>Transcription en direct :</p>
+    <div id="output"></div>
+    <p>Conseils de l'IA :</p>
+    <div id="ai-response">En attente de la question...</div>
+
+    <script>
+        const startBtn = document.getElementById('start-btn');
+        const output = document.getElementById('output');
+        const aiResponse = document.getElementById('ai-response');
+
+        // Initialisation de la reconnaissance vocale (Gratuit via le navigateur)
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        const recognition = new SpeechRecognition();
+        recognition.lang = 'fr-FR';
+        recognition.continuous = true;
+
+        recognition.onresult = (event) => {
+            const transcript = event.results[event.results.length - 1][0].transcript;
+            output.innerText += " " + transcript;
+            
+            // Si la phrase semble être une question, on demande à Gemini
+            if (transcript.length > 20) {
+                askGemini(transcript);
+            }
+        };
+
+        async function askGemini(text) {
+            const API_KEY = "TA_CLE_API_ICI";
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`;
+            
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{ parts: [{ text: `Tu es un assistant d'entretien. Réponds de manière concise (max 2 phrases) à cette question posée par le recruteur : ${text}` }] }]
+                })
+            });
+
+            const data = await response.json();
+            aiResponse.innerText = data.candidates[0].content.parts[0].text;
+        }
+
+        startBtn.onclick = () => recognition.start();
+    </script>
+</body>
+</html>
