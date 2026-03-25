@@ -23,7 +23,7 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'API key not configured on server' });
   }
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${API_KEY}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${API_KEY}`;
 
   // Convert messages format to Gemini format
   const contents = messages.map(m => ({
