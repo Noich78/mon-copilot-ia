@@ -23,13 +23,12 @@
 </div>
 
 <script>
-    <script>
-    // --- CONFIGURATION ---
     const API_KEY = "AIzaSyBVzeqmNIWmuOL4IP6nts-BcUQi2Ch7Awk";
-    // On repasse sur l'identifiant le plus basique : gemini-1.5-flash
-    const MODEL = "gemini-1.5-flash"; 
+    // On utilise 1.5-flash-8b sur l'endpoint v1 (plus robuste aux erreurs 404)
+    const MODEL = "gemini-1.5-flash-8b"; 
 
     const btn = document.getElementById('btn');
+    const status = document.getElementById('status');
     const output = document.getElementById('output');
     const res = document.getElementById('res');
 
@@ -37,10 +36,9 @@
         btn.disabled = true;
         res.innerText = "Réflexion...";
         
-        // SYNTAXE UNIVERSELLE : v1beta avec le préfixe models/ bien intégré
-        const url = `https://generativelanguage.googleapis.
-    
-        
+        // Utilisation de l'endpoint v1 stable
+        const url = `https://generativelanguage.googleapis.com/v1/models/${MODEL}:generateContent?key=${API_KEY}`;
+
         try {
             const response = await fetch(url, {
                 method: 'POST',
