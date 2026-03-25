@@ -1,4 +1,3 @@
-
 // api/ask.js — Vercel Serverless Function
 // La clé API Gemini reste côté serveur, jamais exposée au navigateur
 
